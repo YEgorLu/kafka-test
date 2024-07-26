@@ -11,9 +11,9 @@
 
 Информация по флагам: `go run cmd/kafka-test/main.go cmd/kafka-test/flags.go --help`
 
-Enironment variables (param - description - default):
+Переменные окружения:
 
-| Param name  | Description | Default |
+| Название  | Описание | Default |
 | ------------- | ------------- | ------------- |
 | MIGRATIONS_FOLDER | Папка с миграциями для бд | ./migrations |
 | PORT | Порт на котором запустится сервер | 8080 |
