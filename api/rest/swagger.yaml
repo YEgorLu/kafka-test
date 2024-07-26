@@ -1,0 +1,88 @@
+basePath: /
+definitions:
+  models.AddResponse:
+    properties:
+      id:
+        type: string
+    type: object
+  models.GetOneResponse:
+    properties:
+      dateCreate:
+        type: string
+      dateProcess:
+        type: string
+      id:
+        type: string
+      processed:
+        type: boolean
+      value:
+        type: string
+    type: object
+  models.StatsResponse:
+    properties:
+      countAll:
+        type: integer
+      countProcessed:
+        type: integer
+    type: object
+info:
+  contact: {}
+  description: Swagger API for Kafka Test.
+  license:
+    name: MIT
+    url: https://github.com/YEgorLu/kafka-test/blob/master/LICENSE
+  termsOfService: http://swagger.io/terms/
+  title: Kafka Test Swagger API
+  version: "1.0"
+paths:
+  /messages:
+    post:
+      parameters:
+      - description: Your message
+        in: body
+        name: value
+        required: true
+        schema:
+          example: '{"value": "your message"}'
+          type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.AddResponse'
+      summary: Creates message and puts it in queue for later processing
+      tags:
+      - messages
+  /messages/{id}:
+    get:
+      parameters:
+      - description: Message ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.GetOneResponse'
+      summary: Returns message
+      tags:
+      - messages
+  /messages/stats:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.StatsResponse'
+      summary: Returns overall and processed messages count
+      tags:
+      - messages
+swagger: "2.0"

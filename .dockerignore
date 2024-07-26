@@ -1,0 +1,5 @@
+/build
+.exe
+logs.json
+README.md
+.env

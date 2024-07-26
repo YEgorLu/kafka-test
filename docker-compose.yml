@@ -1,0 +1,120 @@
+version: '3'
+
+networks:
+  std-network:
+    driver: bridge
+
+services:
+  database:
+    image: postgres:13
+    restart: unless-stopped
+    expose:
+      - 5432
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgrespw
+      - POSTGRES_DB=test
+    networks:
+      - std-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d test"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - 22181:2181
+    networks:
+      - std-network
+
+  mq:
+    image: confluentinc/cp-kafka:latest
+    depends_on:
+      - zookeeper
+    ports:
+      - 29092:29092
+    expose:
+      - 9092
+      - 29092
+    networks:
+      - std-network
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://mq:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_HOST
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    healthcheck:
+      test: kafka-cluster cluster-id --bootstrap-server localhost:9092 || exit 1
+      interval: 10s
+      timeout: 10s
+      retries: 60
+  
+  app:
+    image: kafkatest:latest
+    depends_on:
+      database:
+        condition: service_healthy
+      mq:
+        condition: service_healthy
+      init-kafka:
+        condition: service_completed_successfully
+
+    restart: unless-stopped
+    links:
+      - database
+      - mq
+    ports: 
+      - "8080:8080"
+    environment:
+      - DB_PROVIDER=postgres
+      - DB_URL=database
+      - DB_USER=postgres
+      - DB_PASSWORD=postgrespw
+      - DB_DBNAME=test
+      - DB_APPEND_MIGRATIONS=true
+      - DB_FORCE_RECREATE=false
+      - LOGS_PATH=./logs.json
+      - LOG_LEVEL=debug
+      - MIGRATIONS_FOLDER=./migrations
+      - KAFKA_MESSAGES_TOPIC=messages
+      - KAFKA_ERR_MESSAGES_TOPIC=err-messages
+      - KAFKA_BROKERS=mq:9092 
+    networks:
+      - std-network
+
+
+  init-kafka:
+    image: apache/kafka:latest
+    depends_on:
+      mq:
+        condition: service_healthy
+    expose:
+      - 29092
+      - 9092
+    networks:
+      - std-network
+    entrypoint: [ '/bin/sh', '-c' ]
+    command: |
+      "
+      # blocks until kafka is reachable
+      opt/kafka/bin/kafka-topics.sh --bootstrap-server mq:9092 --list
+
+      echo -e 'Creating kafka topics'
+      opt/kafka/bin/kafka-topics.sh --bootstrap-server mq:9092 --create --if-not-exists --topic messages --replication-factor 1 --partitions 3
+      opt/kafka/bin/kafka-topics.sh --bootstrap-server mq:9092 --create --if-not-exists --topic err-messages --replication-factor 1 --partitions 1
+
+      echo -e 'Successfully created the following topics:'
+      opt/kafka/bin/kafka-topics.sh --bootstrap-server mq:9092 --list
+      "      
+
+
+  
